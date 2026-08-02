@@ -84,3 +84,69 @@ def list_recent_emails(max_results: int = 5) -> list[dict[str, str]]:
         raise RuntimeError(
             f"Gmail API request failed: {error}"
         ) from error
+
+
+def search_emails(
+    query: str,
+    max_results: int = 10,
+) -> list[dict[str, str]]:
+    """Search Gmail and return metadata for matching emails."""
+
+    cleaned_query = query.strip()
+
+    if not cleaned_query:
+        raise ValueError("query cannot be empty.")
+
+    if max_results < 1:
+        raise ValueError("max_results must be at least 1.")
+
+    service = build_gmail_service()
+
+    try:
+        response = (
+            service.users()
+            .messages()
+            .list(
+                userId="me",
+                q=cleaned_query,
+                maxResults=max_results,
+            )
+            .execute()
+        )
+
+        messages = response.get("messages", [])
+        results: list[dict[str, str]] = []
+
+        for message in messages:
+            message_id = message["id"]
+
+            message_data = (
+                service.users()
+                .messages()
+                .get(
+                    userId="me",
+                    id=message_id,
+                    format="metadata",
+                    metadataHeaders=["From", "Subject", "Date"],
+                )
+                .execute()
+            )
+
+            headers = message_data.get("payload", {}).get("headers", [])
+
+            results.append(
+                {
+                    "id": message_id,
+                    "sender": get_header(headers, "From"),
+                    "subject": get_header(headers, "Subject") or "(No subject)",
+                    "date": get_header(headers, "Date"),
+                }
+            )
+
+        return results
+
+    except HttpError as error:
+        raise RuntimeError(
+            f"Gmail search request failed: {error}"
+        ) from error
+
