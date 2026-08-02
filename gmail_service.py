@@ -1,4 +1,6 @@
+import base64
 from typing import Any
+
 
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
@@ -25,6 +27,47 @@ def get_header(headers: list[dict[str, str]], name: str) -> str:
     for header in headers:
         if header.get("name", "").lower() == name.lower():
             return header.get("value", "")
+
+    return ""
+
+
+def decode_base64url(data: str) -> str:
+    """Decode Gmail Base64URL data into readable UTF-8 text."""
+
+    if not data:
+        return ""
+
+    try:
+        decoded_bytes = base64.urlsafe_b64decode(
+            data + "=" * (-len(data) % 4)
+        )
+
+        return decoded_bytes.decode(
+            "utf-8",
+            errors="replace",
+        )
+
+    except (ValueError, TypeError) as error:
+        raise ValueError(
+            "Unable to decode the email body."
+        ) from error
+
+
+def extract_plain_text(part: dict[str, Any]) -> str:
+    """Recursively extract the plain-text body from a Gmail MIME part."""
+
+    mime_type = part.get("mimeType", "")
+    body = part.get("body", {})
+    data = body.get("data")
+
+    if mime_type == "text/plain" and data:
+        return decode_base64url(data).strip()
+
+    for child_part in part.get("parts", []):
+        text = extract_plain_text(child_part)
+
+        if text:
+            return text
 
     return ""
 
@@ -149,4 +192,48 @@ def search_emails(
         raise RuntimeError(
             f"Gmail search request failed: {error}"
         ) from error
+
+
+def get_email(message_id: str) -> dict[str, str]:
+    """Return metadata and plain-text content for one Gmail message."""
+
+    cleaned_message_id = message_id.strip()
+
+    if not cleaned_message_id:
+        raise ValueError("message_id cannot be empty.")
+
+    service = build_gmail_service()
+
+    try:
+        message_data = (
+            service.users()
+            .messages()
+            .get(
+                userId="me",
+                id=cleaned_message_id,
+                format="full",
+            )
+            .execute()
+        )
+
+        payload = message_data.get("payload", {})
+        headers = payload.get("headers", [])
+
+        body = extract_plain_text(payload)
+
+        return {
+            "id": message_data.get("id", cleaned_message_id),
+            "thread_id": message_data.get("threadId", ""),
+            "sender": get_header(headers, "From"),
+            "recipient": get_header(headers, "To"),
+            "subject": get_header(headers, "Subject") or "(No subject)",
+            "date": get_header(headers, "Date"),
+            "body": body or "(No plain-text body found)",
+        }
+
+    except HttpError as error:
+        raise RuntimeError(
+            f"Unable to retrieve Gmail message: {error}"
+        ) from error
+
 
