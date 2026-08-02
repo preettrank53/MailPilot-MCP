@@ -11,3 +11,5 @@ MailPilot MCP is an AI-powered Gmail assistant built using Python, Streamlit, Gm
 - Gmail search functionality added supporting advanced query syntax (e.g. `is:unread`, `from:sender`, `newer_than:7d`)
 - Email body extraction functionality implemented with recursive MIME traversal and Base64URL decoding
 - Integrated Gmail search with Streamlit frontend displaying structured results with collapsible detail expanders
+- Added detailed email viewing within the Streamlit UI, persisting state using Streamlit Session State across script reruns
+- Created a basic Model Context Protocol (MCP) server exposing the Gmail search functionality as an MCP tool
