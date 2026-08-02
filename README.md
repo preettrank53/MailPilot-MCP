@@ -6,3 +6,4 @@ MailPilot MCP is an AI-powered Gmail assistant built using Python, Streamlit, Gm
 
 - Project structure created
 - Streamlit interface running
+- Gmail OAuth 2.0 authentication flow completed
