@@ -25,7 +25,8 @@ MailPilot-MCP/
     ├── test_search_emails.py
     ├── test_get_email.py
     ├── test_mcp_tool.py
-    └── test_mcp_client.py
+    ├── test_mcp_client.py
+    └── test_tool_selection.py  # Verifies model tool selection and routing decisions
 ```
 
 ## Running Tests
@@ -53,6 +54,9 @@ All verification and protocol tests have been consolidated in the `tests/` direc
 
 # Test the Groq text generation AI service
 .venv\Scripts\python -m tests.test_ai_service
+
+# Test the model's tool selection and arguments generation
+.venv\Scripts\python -m tests.test_tool_selection
 ```
 
 ## Current status
@@ -70,3 +74,4 @@ All verification and protocol tests have been consolidated in the `tests/` direc
 - Added the `get_gmail_email` tool to retrieve full email body details by message ID, establishing a clean separation between search and retrieval (lazy loading)
 - Extracted and encapsulated the low-level MCP transport and connection details into a reusable `mcp_client.py` module
 - Integrated Groq API for text generation using the official SDK, loading credentials and model config from `.env` (fully git-ignored)
+- Upgraded Groq model to `openai/gpt-oss-20b` and implemented dynamic model-side tool selection and routing without execution
