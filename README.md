@@ -61,3 +61,4 @@ All verification and protocol tests have been consolidated in the `tests/` direc
 - Added detailed email viewing within the Streamlit UI, persisting state using Streamlit Session State across script reruns
 - Created a basic Model Context Protocol (MCP) server exposing the Gmail search functionality as an MCP tool
 - Implemented an MCP client that starts the server as a subprocess and tests tool discovery and execution over the stdio transport
+- Added the `get_gmail_email` tool to retrieve full email body details by message ID, establishing a clean separation between search and retrieval (lazy loading)

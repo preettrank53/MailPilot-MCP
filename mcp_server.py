@@ -2,7 +2,7 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from gmail_service import search_emails
+from gmail_service import get_email, search_emails
 
 
 mcp = FastMCP("MailPilot Gmail MCP")
@@ -35,6 +35,26 @@ def search_gmail(
         query=query,
         max_results=max_results,
     )
+
+
+@mcp.tool()
+def get_gmail_email(
+    message_id: str,
+) -> dict[str, Any]:
+    """
+    Retrieve one Gmail message using its message ID.
+
+    Use this tool after search_gmail returns a message ID.
+
+    Args:
+        message_id: Gmail message ID returned by search_gmail.
+
+    Returns:
+        Email details containing the message ID, thread ID, sender,
+        recipient, subject, date and plain-text body.
+    """
+
+    return get_email(message_id)
 
 
 if __name__ == "__main__":
