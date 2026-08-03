@@ -9,6 +9,7 @@ MailPilot-MCP/
 ├── app.py                  # Streamlit interface
 ├── auth.py                 # Gmail OAuth 2.0 flow helper
 ├── gmail_service.py        # Gmail API service and search layer
+├── mcp_client.py           # Reusable Model Context Protocol (MCP) client module
 ├── mcp_server.py           # Model Context Protocol (MCP) server
 ├── requirements.txt        # Pinned dependencies
 ├── README.md               # Project documentation
@@ -62,3 +63,4 @@ All verification and protocol tests have been consolidated in the `tests/` direc
 - Created a basic Model Context Protocol (MCP) server exposing the Gmail search functionality as an MCP tool
 - Implemented an MCP client that starts the server as a subprocess and tests tool discovery and execution over the stdio transport
 - Added the `get_gmail_email` tool to retrieve full email body details by message ID, establishing a clean separation between search and retrieval (lazy loading)
+- Extracted and encapsulated the low-level MCP transport and connection details into a reusable `mcp_client.py` module
