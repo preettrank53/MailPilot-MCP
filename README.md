@@ -6,6 +6,8 @@ MailPilot MCP is an AI-powered Gmail assistant built using Python, Streamlit, Gm
 
 ```text
 MailPilot-MCP/
+├── .streamlit/
+│   └── secrets.toml        # Streamlit web credentials configuration (ignored)
 ├── ai_service.py           # Groq API LLM assistant integration
 ├── app.py                  # Streamlit interface
 ├── auth.py                 # Gmail OAuth 2.0 flow helper
@@ -95,3 +97,4 @@ All verification and protocol tests have been consolidated in the `tests/` direc
 - Built a multi-step iterative AI agent Reasoning Loop (`run_iterative_gmail_agent`) allowing complex, sequential tool execution (e.g. `search_gmail` -> `get_gmail_email` -> grounded final answer) while enforcing a loop execution limit of 5 calls to prevent infinite loops.
 - Connected the multi-step iterative Gmail agent to a Streamlit Chat interface, replacing the manual search panels with a conversational workspace, exposing tool traces, and preserving conversation logs across runs.
 - Implemented short-term conversational memory within the iterative Gmail agent, allowing the model to resolve contextual follow-ups (such as "it" or "the previous email") using a validated, token-optimized message window.
+- Configured a separate Google Web OAuth client for deployment compatibility, storing credentials in a Git-ignored `.streamlit/secrets.toml` file while maintaining local Desktop OAuth settings.
