@@ -6,6 +6,7 @@ MailPilot MCP is an AI-powered Gmail assistant built using Python, Streamlit, Gm
 
 ```text
 MailPilot-MCP/
+├── ai_service.py           # Groq API LLM assistant integration
 ├── app.py                  # Streamlit interface
 ├── auth.py                 # Gmail OAuth 2.0 flow helper
 ├── gmail_service.py        # Gmail API service and search layer
@@ -18,6 +19,7 @@ MailPilot-MCP/
 ├── token.json              # Cached OAuth tokens (ignored)
 └── tests/                  # Verification and test suite
     ├── __init__.py
+    ├── test_ai_service.py
     ├── test_auth.py
     ├── test_gmail_service.py
     ├── test_search_emails.py
@@ -48,6 +50,9 @@ All verification and protocol tests have been consolidated in the `tests/` direc
 
 # Test the MCP server and tool over stdio transport using the MCP client
 .venv\Scripts\python -m tests.test_mcp_client
+
+# Test the Groq text generation AI service
+.venv\Scripts\python -m tests.test_ai_service
 ```
 
 ## Current status
@@ -64,3 +69,4 @@ All verification and protocol tests have been consolidated in the `tests/` direc
 - Implemented an MCP client that starts the server as a subprocess and tests tool discovery and execution over the stdio transport
 - Added the `get_gmail_email` tool to retrieve full email body details by message ID, establishing a clean separation between search and retrieval (lazy loading)
 - Extracted and encapsulated the low-level MCP transport and connection details into a reusable `mcp_client.py` module
+- Integrated Groq API for text generation using the official SDK, loading credentials and model config from `.env` (fully git-ignored)
