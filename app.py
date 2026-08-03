@@ -1,6 +1,9 @@
+import asyncio
+from typing import Any
+
 import streamlit as st
 
-from gmail_service import get_email, search_emails
+from ai_service import run_iterative_gmail_agent
 
 
 st.set_page_config(
@@ -9,122 +12,153 @@ st.set_page_config(
     layout="centered",
 )
 
-if "selected_email" not in st.session_state:
-    st.session_state.selected_email = None
 
-if "search_results" not in st.session_state:
-    st.session_state.search_results = []
+def initialize_session_state() -> None:
+    """Initialize values that must survive Streamlit reruns."""
 
-if "search_completed" not in st.session_state:
-    st.session_state.search_completed = False
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+
+    if "last_tool_history" not in st.session_state:
+        st.session_state.last_tool_history = []
 
 
-st.title("MailPilot MCP")
-st.subheader("Search your Gmail inbox")
+def display_tool_history(
+    tool_history: list[dict[str, Any]],
+) -> None:
+    """Display MCP tool activity in a compact expander."""
 
-st.write(
-    "Enter a Gmail search query to find matching emails."
-)
+    if not tool_history:
+        return
 
-query = st.text_input(
-    "Gmail search query",
-    placeholder="Example: is:unread newer_than:7d",
-)
+    with st.expander(
+        f"Tool activity ({len(tool_history)} call(s))"
+    ):
+        for index, tool_call in enumerate(
+            tool_history,
+            start=1,
+        ):
+            st.markdown(
+                f"**{index}. `{tool_call['tool_name']}`**"
+            )
 
-max_results = st.number_input(
-    "Maximum results",
-    min_value=1,
-    max_value=20,
-    value=5,
-    step=1,
-)
-
-search_button = st.button(
-    "Search emails",
-    type="primary",
-)
-
-if search_button:
-    if not query.strip():
-        st.warning("Enter a Gmail search query.")
-
-    else:
-        try:
-            with st.spinner("Searching Gmail..."):
-                emails = search_emails(
-                    query=query,
-                    max_results=int(max_results),
-                )
-
-            st.session_state.search_results = emails
-            st.session_state.selected_email = None
-            st.session_state.search_completed = True
-
-        except ValueError as error:
-            st.warning(str(error))
-
-        except RuntimeError as error:
-            st.error(str(error))
-
-        except Exception:
-            st.error(
-                "An unexpected error occurred while searching Gmail."
+            st.json(
+                tool_call["arguments"]
             )
 
 
-emails = st.session_state.search_results
+initialize_session_state()
 
-if emails:
-    st.success(
-        f"Found {len(emails)} matching emails."
+st.title("MailPilot MCP")
+st.caption(
+    "AI-powered Gmail assistant using Groq and MCP"
+)
+
+with st.sidebar:
+    st.subheader("Example prompts")
+
+    st.code(
+        "Show my five unread emails.",
+        language=None,
     )
 
-    for index, email in enumerate(emails, start=1):
-        title = f"{index}. {email['subject']}"
+    st.code(
+        "Summarize my newest unread email.",
+        language=None,
+    )
 
-        with st.expander(title):
-            st.write(f"**From:** {email['sender']}")
-            st.write(f"**Date:** {email['date']}")
-            st.caption(f"Message ID: {email['id']}")
+    st.code(
+        "Find my latest email from Medium.",
+        language=None,
+    )
 
-            if st.button(
-                "Read email",
-                key=f"read_{email['id']}",
-            ):
-                try:
-                    with st.spinner("Loading email..."):
-                        st.session_state.selected_email = get_email(
-                            email["id"]
-                        )
+    st.warning(
+        "Email data returned by Gmail tools is sent to the "
+        "configured AI provider for generating the answer."
+    )
 
-                except ValueError as error:
-                    st.warning(str(error))
-
-                except RuntimeError as error:
-                    st.error(str(error))
-
-                except Exception:
-                    st.error(
-                        "An unexpected error occurred while loading the email."
-                    )
-
-elif st.session_state.search_completed:
-    st.info("No matching emails were found.")
-
-
-selected_email = st.session_state.selected_email
-
-if selected_email:
-    st.divider()
-    st.subheader(selected_email["subject"])
-
-    st.write(f"**From:** {selected_email['sender']}")
-    st.write(f"**To:** {selected_email['recipient']}")
-    st.write(f"**Date:** {selected_email['date']}")
-
-    st.markdown("### Email body")
-    st.text(selected_email["body"])
-
-    if st.button("Close email"):
-        st.session_state.selected_email = None
+    if st.button("Clear conversation"):
+        st.session_state.messages = []
+        st.session_state.last_tool_history = []
         st.rerun()
+
+
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+        if message.get("tool_history"):
+            display_tool_history(
+                message["tool_history"]
+            )
+
+
+prompt = st.chat_input(
+    "Ask something about your Gmail inbox"
+)
+
+if prompt:
+    conversation_history = [
+        {
+            "role": message["role"],
+            "content": message["content"],
+        }
+        for message in st.session_state.messages
+        if message.get("role") in {"user", "assistant"}
+        and message.get("content")
+    ]
+
+    st.session_state.messages.append(
+        {
+            "role": "user",
+            "content": prompt,
+        }
+    )
+
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    try:
+        with st.chat_message("assistant"):
+            with st.spinner(
+                "MailPilot is checking your Gmail..."
+            ):
+                result = asyncio.run(
+                    run_iterative_gmail_agent(
+                        user_request=prompt,
+                        conversation_history=conversation_history,
+                    )
+                )
+
+            answer = result["answer"]
+            tool_history = result["tool_history"]
+
+            st.markdown(answer)
+            display_tool_history(tool_history)
+
+        st.session_state.messages.append(
+            {
+                "role": "assistant",
+                "content": answer,
+                "tool_history": tool_history,
+            }
+        )
+
+        st.session_state.last_tool_history = (
+            tool_history
+        )
+
+    except ValueError as error:
+        with st.chat_message("assistant"):
+            st.warning(str(error))
+
+    except RuntimeError as error:
+        with st.chat_message("assistant"):
+            st.error(str(error))
+
+    except Exception:
+        with st.chat_message("assistant"):
+            st.error(
+                "An unexpected error occurred while processing "
+                "your request."
+            )

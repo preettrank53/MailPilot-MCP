@@ -319,10 +319,50 @@ async def run_gmail_agent(
     }
 
 
+def prepare_conversation_history(
+    conversation_history: list[dict[str, str]] | None,
+    max_messages: int = 10,
+) -> list[dict[str, str]]:
+    """Validate and limit conversation history for the model."""
+
+    if conversation_history is None:
+        return []
+
+    if not isinstance(conversation_history, list):
+        raise TypeError(
+            "conversation_history must be a list."
+        )
+
+    prepared_messages: list[dict[str, str]] = []
+
+    for message in conversation_history[-max_messages:]:
+        if not isinstance(message, dict):
+            continue
+
+        role = str(message.get("role", "")).strip()
+        content = str(message.get("content", "")).strip()
+
+        if role not in {"user", "assistant"}:
+            continue
+
+        if not content:
+            continue
+
+        prepared_messages.append(
+            {
+                "role": role,
+                "content": content,
+            }
+        )
+
+    return prepared_messages
+
+
 async def run_iterative_gmail_agent(
     user_request: str,
+    conversation_history: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
-    """Autonomous iterative Gmail agent that loops reasoning and tool calls."""
+    """Autonomous iterative Gmail agent that loops reasoning and tool calls with context."""
 
     cleaned_request = user_request.strip()
 
@@ -335,18 +375,27 @@ async def run_iterative_gmail_agent(
     client = get_groq_client()
     model_name = get_model_name()
 
+    history = prepare_conversation_history(
+        conversation_history
+    )
+
     messages: list[dict[str, Any]] = [
         {
             "role": "system",
             "content": (
-                "You are MailPilot, an autonomous Gmail assistant. "
-                "Use the available tools when Gmail data is needed. "
+                "You are MailPilot, a Gmail assistant. "
+                "Use Gmail tools whenever private Gmail data is needed. "
+                "Use the recent conversation to understand references "
+                "such as 'it', 'that email', and 'the previous one'. "
                 "Never invent email details or message IDs. "
-                "After receiving a tool result, analyze it and choose to call another tool if needed, "
-                "or summarize the findings clearly to answer the user request. "
-                "Do not claim an action succeeded unless the tool result confirms it."
+                "If the previous conversation does not contain enough "
+                "information, use the available Gmail tools to retrieve "
+                "the required data. "
+                "After receiving tool results, answer clearly and only "
+                "using information supported by those results."
             ),
         },
+        *history,
         {
             "role": "user",
             "content": cleaned_request,

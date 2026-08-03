@@ -28,7 +28,9 @@ MailPilot-MCP/
     ├── test_mcp_client.py
     ├── test_tool_selection.py  # Verifies model tool selection and routing decisions
     ├── test_gmail_agent.py     # Verifies the complete single-tool agent loop
-    └── test_iterative_agent.py # Verifies the multi-step reasoning agent loop
+    ├── test_iterative_agent.py # Verifies the multi-step reasoning agent loop
+    ├── test_app_import.py      # Verifies Streamlit app imports
+    └── test_conversation_memory.py # Verifies conversation memory and follow-up contexts
 ```
 
 ## Running Tests
@@ -65,6 +67,12 @@ All verification and protocol tests have been consolidated in the `tests/` direc
 
 # Test the multi-step iterative AI agent reasoning loop
 .venv\Scripts\python -m tests.test_iterative_agent
+
+# Run syntax/import test on the Streamlit app
+.venv\Scripts\python -m tests.test_app_import
+
+# Test conversation memory and follow-up context resolution
+.venv\Scripts\python -m tests.test_conversation_memory
 ```
 
 ## Current status
@@ -85,4 +93,5 @@ All verification and protocol tests have been consolidated in the `tests/` direc
 - Upgraded Groq model to `openai/gpt-oss-20b` and implemented dynamic model-side tool selection and routing without execution
 - Built the complete single-tool agent loop executing Groq-selected tools dynamically through the MCP client and generating grounded answers
 - Built a multi-step iterative AI agent Reasoning Loop (`run_iterative_gmail_agent`) allowing complex, sequential tool execution (e.g. `search_gmail` -> `get_gmail_email` -> grounded final answer) while enforcing a loop execution limit of 5 calls to prevent infinite loops.
-```
+- Connected the multi-step iterative Gmail agent to a Streamlit Chat interface, replacing the manual search panels with a conversational workspace, exposing tool traces, and preserving conversation logs across runs.
+- Implemented short-term conversational memory within the iterative Gmail agent, allowing the model to resolve contextual follow-ups (such as "it" or "the previous email") using a validated, token-optimized message window.
