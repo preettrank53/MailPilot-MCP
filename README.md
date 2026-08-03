@@ -26,7 +26,9 @@ MailPilot-MCP/
     ├── test_get_email.py
     ├── test_mcp_tool.py
     ├── test_mcp_client.py
-    └── test_tool_selection.py  # Verifies model tool selection and routing decisions
+    ├── test_tool_selection.py  # Verifies model tool selection and routing decisions
+    ├── test_gmail_agent.py     # Verifies the complete single-tool agent loop
+    └── test_iterative_agent.py # Verifies the multi-step reasoning agent loop
 ```
 
 ## Running Tests
@@ -57,6 +59,12 @@ All verification and protocol tests have been consolidated in the `tests/` direc
 
 # Test the model's tool selection and arguments generation
 .venv\Scripts\python -m tests.test_tool_selection
+
+# Test the complete single-tool Gmail agent workflow
+.venv\Scripts\python -m tests.test_gmail_agent
+
+# Test the multi-step iterative AI agent reasoning loop
+.venv\Scripts\python -m tests.test_iterative_agent
 ```
 
 ## Current status
@@ -75,3 +83,6 @@ All verification and protocol tests have been consolidated in the `tests/` direc
 - Extracted and encapsulated the low-level MCP transport and connection details into a reusable `mcp_client.py` module
 - Integrated Groq API for text generation using the official SDK, loading credentials and model config from `.env` (fully git-ignored)
 - Upgraded Groq model to `openai/gpt-oss-20b` and implemented dynamic model-side tool selection and routing without execution
+- Built the complete single-tool agent loop executing Groq-selected tools dynamically through the MCP client and generating grounded answers
+- Built a multi-step iterative AI agent Reasoning Loop (`run_iterative_gmail_agent`) allowing complex, sequential tool execution (e.g. `search_gmail` -> `get_gmail_email` -> grounded final answer) while enforcing a loop execution limit of 5 calls to prevent infinite loops.
+```

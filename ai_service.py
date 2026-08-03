@@ -5,7 +5,7 @@ from typing import Any
 from dotenv import load_dotenv
 from groq import Groq
 
-from mcp_client import list_mcp_tools
+from mcp_client import call_mcp_tool, list_mcp_tools
 
 
 load_dotenv()
@@ -153,3 +153,299 @@ async def select_gmail_tool(
         "tool_name": tool_call.function.name,
         "arguments": arguments,
     }
+
+
+def validate_selected_tool(
+    tool_name: str,
+    available_tools: list[dict[str, Any]],
+) -> None:
+    """Confirm that the model selected a discovered MCP tool."""
+
+    allowed_names = {
+        tool["name"]
+        for tool in available_tools
+    }
+
+    if tool_name not in allowed_names:
+        raise RuntimeError(
+            f"Groq selected an unknown tool: {tool_name}"
+        )
+
+
+def serialize_tool_result(result: Any) -> str:
+    """Convert an MCP tool result into text for the model."""
+
+    try:
+        return json.dumps(
+            result,
+            ensure_ascii=False,
+        )
+
+    except TypeError as error:
+        raise RuntimeError(
+            "The MCP tool returned a non-serializable result."
+        ) from error
+
+
+async def run_gmail_agent(
+    user_request: str,
+) -> dict[str, Any]:
+    """Select, execute and summarize a Gmail MCP tool call."""
+
+    cleaned_request = user_request.strip()
+
+    if not cleaned_request:
+        raise ValueError("user_request cannot be empty.")
+
+    mcp_tools = await list_mcp_tools()
+    groq_tools = convert_mcp_tools_to_groq(mcp_tools)
+
+    client = get_groq_client()
+    model_name = get_model_name()
+
+    messages: list[dict[str, Any]] = [
+        {
+            "role": "system",
+            "content": (
+                "You are MailPilot, a Gmail assistant. "
+                "Use the available tools when Gmail data is needed. "
+                "Never invent email details or message IDs. "
+                "After receiving a tool result, summarize it clearly. "
+                "Do not claim an action succeeded unless the tool "
+                "result confirms it."
+            ),
+        },
+        {
+            "role": "user",
+            "content": cleaned_request,
+        },
+    ]
+
+    first_response = client.chat.completions.create(
+        model=model_name,
+        messages=messages,
+        tools=groq_tools,
+        tool_choice="auto",
+        temperature=0,
+    )
+
+    assistant_message = first_response.choices[0].message
+
+    if not assistant_message.tool_calls:
+        return {
+            "answer": assistant_message.content or "",
+            "tool_used": None,
+            "tool_arguments": None,
+        }
+
+    tool_call = assistant_message.tool_calls[0]
+    tool_name = tool_call.function.name
+
+    validate_selected_tool(
+        tool_name=tool_name,
+        available_tools=mcp_tools,
+    )
+
+    try:
+        tool_arguments = json.loads(
+            tool_call.function.arguments
+        )
+    except json.JSONDecodeError as error:
+        raise RuntimeError(
+            "Groq returned invalid tool arguments."
+        ) from error
+
+    if not isinstance(tool_arguments, dict):
+        raise RuntimeError(
+            "Groq tool arguments must be a JSON object."
+        )
+
+    tool_result = await call_mcp_tool(
+        tool_name=tool_name,
+        arguments=tool_arguments,
+    )
+
+    serialized_result = serialize_tool_result(
+        tool_result
+    )
+
+    messages.append(
+        {
+            "role": "assistant",
+            "content": assistant_message.content or "",
+            "tool_calls": [
+                {
+                    "id": tool_call.id,
+                    "type": "function",
+                    "function": {
+                        "name": tool_name,
+                        "arguments": (
+                            tool_call.function.arguments
+                        ),
+                    },
+                }
+            ],
+        }
+    )
+
+    messages.append(
+        {
+            "role": "tool",
+            "tool_call_id": tool_call.id,
+            "name": tool_name,
+            "content": serialized_result,
+        }
+    )
+
+    final_response = client.chat.completions.create(
+        model=model_name,
+        messages=messages,
+        tools=groq_tools,
+        tool_choice="none",
+        temperature=0,
+    )
+
+    final_message = final_response.choices[0].message
+
+    if not final_message.content:
+        raise RuntimeError(
+            "Groq returned no final answer."
+        )
+
+    return {
+        "answer": final_message.content.strip(),
+        "tool_used": tool_name,
+        "tool_arguments": tool_arguments,
+    }
+
+
+async def run_iterative_gmail_agent(
+    user_request: str,
+) -> dict[str, Any]:
+    """Autonomous iterative Gmail agent that loops reasoning and tool calls."""
+
+    cleaned_request = user_request.strip()
+
+    if not cleaned_request:
+        raise ValueError("user_request cannot be empty.")
+
+    mcp_tools = await list_mcp_tools()
+    groq_tools = convert_mcp_tools_to_groq(mcp_tools)
+
+    client = get_groq_client()
+    model_name = get_model_name()
+
+    messages: list[dict[str, Any]] = [
+        {
+            "role": "system",
+            "content": (
+                "You are MailPilot, an autonomous Gmail assistant. "
+                "Use the available tools when Gmail data is needed. "
+                "Never invent email details or message IDs. "
+                "After receiving a tool result, analyze it and choose to call another tool if needed, "
+                "or summarize the findings clearly to answer the user request. "
+                "Do not claim an action succeeded unless the tool result confirms it."
+            ),
+        },
+        {
+            "role": "user",
+            "content": cleaned_request,
+        },
+    ]
+
+    tool_history: list[dict[str, Any]] = []
+    total_tool_calls = 0
+    MAX_TOOL_CALLS = 5
+
+    while True:
+        response = client.chat.completions.create(
+            model=model_name,
+            messages=messages,
+            tools=groq_tools,
+            tool_choice="auto",
+            temperature=0,
+        )
+
+        message = response.choices[0].message
+
+        if not message.tool_calls:
+            final_content = message.content or ""
+            break
+
+        tool_call = message.tool_calls[0]
+        tool_name = tool_call.function.name
+
+        validate_selected_tool(
+            tool_name=tool_name,
+            available_tools=mcp_tools,
+        )
+
+        try:
+            tool_arguments = json.loads(
+                tool_call.function.arguments
+            )
+        except json.JSONDecodeError as error:
+            raise RuntimeError(
+                "Groq returned invalid tool arguments."
+            ) from error
+
+        if not isinstance(tool_arguments, dict):
+            raise RuntimeError(
+                "Groq tool arguments must be a JSON object."
+            )
+
+        if total_tool_calls >= MAX_TOOL_CALLS:
+            raise RuntimeError("Maximum tool calls exceeded.")
+
+        tool_result = await call_mcp_tool(
+            tool_name=tool_name,
+            arguments=tool_arguments,
+        )
+        total_tool_calls += 1
+
+        serialized_result = serialize_tool_result(
+            tool_result
+        )
+
+        tool_history.append(
+            {
+                "tool_name": tool_name,
+                "arguments": tool_arguments,
+                "result": tool_result,
+            }
+        )
+
+        messages.append(
+            {
+                "role": "assistant",
+                "content": message.content or "",
+                "tool_calls": [
+                    {
+                        "id": tool_call.id,
+                        "type": "function",
+                        "function": {
+                            "name": tool_name,
+                            "arguments": (
+                                tool_call.function.arguments
+                            ),
+                        },
+                    }
+                ],
+            }
+        )
+
+        messages.append(
+            {
+                "role": "tool",
+                "tool_call_id": tool_call.id,
+                "name": tool_name,
+                "content": serialized_result,
+            }
+        )
+
+    return {
+        "answer": final_content.strip(),
+        "tool_history": tool_history,
+        "total_tool_calls": total_tool_calls,
+    }
+
