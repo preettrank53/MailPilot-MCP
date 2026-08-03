@@ -13,6 +13,36 @@ st.set_page_config(
 )
 
 
+def require_gmail_connection() -> None:
+    """Stop the app until the user connects a Google account."""
+
+    if not st.runtime.exists():
+        return
+
+    try:
+        if st.user.is_logged_in:
+            return
+    except (AttributeError, KeyError):
+        return
+
+    st.title("MailPilot MCP")
+    st.caption("AI-powered Gmail assistant")
+
+    st.write(
+        "Connect your Gmail account to search and summarize "
+        "your emails."
+    )
+
+    if st.button(
+        "Connect Gmail",
+        type="primary",
+        use_container_width=False,
+    ):
+        st.login()
+
+    st.stop()
+
+
 def initialize_session_state() -> None:
     """Initialize values that must survive Streamlit reruns."""
 
@@ -47,6 +77,17 @@ def display_tool_history(
             )
 
 
+require_gmail_connection()
+
+if st.runtime.exists():
+    access_token = st.user.tokens.get("access")
+    if not access_token:
+        st.error(
+            "Google did not return a Gmail access token. "
+            "Disconnect Gmail and authorize again."
+        )
+        st.stop()
+
 initialize_session_state()
 
 st.title("MailPilot MCP")
@@ -55,6 +96,24 @@ st.caption(
 )
 
 with st.sidebar:
+    st.caption("Connected Gmail")
+
+    user_name = getattr(st.user, "name", "")
+    user_email = getattr(st.user, "email", "")
+
+    if user_name:
+        st.write(f"**{user_name}**")
+
+    if user_email:
+        st.caption(user_email)
+
+    if st.button("Disconnect Gmail"):
+        st.session_state.messages = []
+        st.session_state.last_tool_history = []
+        st.logout()
+
+    st.divider()
+
     st.subheader("Example prompts")
 
     st.code(
