@@ -189,6 +189,7 @@ def serialize_tool_result(result: Any) -> str:
 
 async def run_gmail_agent(
     user_request: str,
+    access_token: str | None = None,
 ) -> dict[str, Any]:
     """Select, execute and summarize a Gmail MCP tool call."""
 
@@ -263,6 +264,7 @@ async def run_gmail_agent(
     tool_result = await call_mcp_tool(
         tool_name=tool_name,
         arguments=tool_arguments,
+        access_token=access_token,
     )
 
     serialized_result = serialize_tool_result(
@@ -361,6 +363,7 @@ def prepare_conversation_history(
 async def run_iterative_gmail_agent(
     user_request: str,
     conversation_history: list[dict[str, str]] | None = None,
+    access_token: str | None = None,
 ) -> dict[str, Any]:
     """Autonomous iterative Gmail agent that loops reasoning and tool calls with context."""
 
@@ -449,6 +452,7 @@ async def run_iterative_gmail_agent(
         tool_result = await call_mcp_tool(
             tool_name=tool_name,
             arguments=tool_arguments,
+            access_token=access_token,
         )
         total_tool_calls += 1
 

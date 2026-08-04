@@ -186,6 +186,7 @@ if prompt:
                     run_iterative_gmail_agent(
                         user_request=prompt,
                         conversation_history=conversation_history,
+                        access_token=st.user.tokens.get("access"),
                     )
                 )
 

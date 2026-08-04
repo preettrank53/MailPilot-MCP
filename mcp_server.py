@@ -1,3 +1,4 @@
+import os
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
@@ -6,6 +7,17 @@ from gmail_service import get_email, search_emails
 
 
 mcp = FastMCP("MailPilot Gmail MCP")
+
+
+def get_request_access_token() -> str | None:
+    """Return the web user's Gmail token from the server environment."""
+
+    access_token = os.getenv(
+        "MAILPILOT_GMAIL_ACCESS_TOKEN",
+        "",
+    ).strip()
+
+    return access_token or None
 
 
 @mcp.tool()
@@ -34,6 +46,7 @@ def search_gmail(
     return search_emails(
         query=query,
         max_results=max_results,
+        access_token=get_request_access_token(),
     )
 
 
@@ -54,7 +67,10 @@ def get_gmail_email(
         recipient, subject, date and plain-text body.
     """
 
-    return get_email(message_id)
+    return get_email(
+        message_id=message_id,
+        access_token=get_request_access_token(),
+    )
 
 
 if __name__ == "__main__":

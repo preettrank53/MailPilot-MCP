@@ -2,16 +2,33 @@ import base64
 from typing import Any
 
 
+from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 from auth import authenticate_gmail
 
 
-def build_gmail_service() -> Any:
+def build_gmail_service(
+    access_token: str | None = None,
+) -> Any:
     """Create and return an authenticated Gmail API service."""
 
-    credentials = authenticate_gmail()
+    cleaned_access_token = (
+        access_token.strip()
+        if access_token
+        else ""
+    )
+
+    if cleaned_access_token:
+        credentials = Credentials(
+            token=cleaned_access_token,
+            scopes=[
+                "https://www.googleapis.com/auth/gmail.readonly"
+            ],
+        )
+    else:
+        credentials = authenticate_gmail()
 
     return build(
         "gmail",
@@ -72,13 +89,16 @@ def extract_plain_text(part: dict[str, Any]) -> str:
     return ""
 
 
-def list_recent_emails(max_results: int = 5) -> list[dict[str, str]]:
+def list_recent_emails(
+    max_results: int = 5,
+    access_token: str | None = None,
+) -> list[dict[str, str]]:
     """Return basic details for recent inbox emails."""
 
     if max_results < 1:
         raise ValueError("max_results must be at least 1.")
 
-    service = build_gmail_service()
+    service = build_gmail_service(access_token=access_token)
 
     try:
         response = (
@@ -132,6 +152,7 @@ def list_recent_emails(max_results: int = 5) -> list[dict[str, str]]:
 def search_emails(
     query: str,
     max_results: int = 10,
+    access_token: str | None = None,
 ) -> list[dict[str, str]]:
     """Search Gmail and return metadata for matching emails."""
 
@@ -143,7 +164,7 @@ def search_emails(
     if max_results < 1:
         raise ValueError("max_results must be at least 1.")
 
-    service = build_gmail_service()
+    service = build_gmail_service(access_token=access_token)
 
     try:
         response = (
@@ -194,7 +215,10 @@ def search_emails(
         ) from error
 
 
-def get_email(message_id: str) -> dict[str, str]:
+def get_email(
+    message_id: str,
+    access_token: str | None = None,
+) -> dict[str, str]:
     """Return metadata and plain-text content for one Gmail message."""
 
     cleaned_message_id = message_id.strip()
@@ -202,7 +226,7 @@ def get_email(message_id: str) -> dict[str, str]:
     if not cleaned_message_id:
         raise ValueError("message_id cannot be empty.")
 
-    service = build_gmail_service()
+    service = build_gmail_service(access_token=access_token)
 
     try:
         message_data = (

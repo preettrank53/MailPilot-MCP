@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any, Awaitable, Callable
@@ -58,13 +59,33 @@ def parse_tool_result(result: Any) -> Any:
 
 async def run_with_mcp_session(
     callback: SessionCallback,
+    access_token: str | None = None,
 ) -> Any:
     """Start the MCP server and run a callback with an initialized session."""
+
+    server_environment = os.environ.copy()
+
+    cleaned_access_token = (
+        access_token.strip()
+        if access_token
+        else ""
+    )
+
+    if cleaned_access_token:
+        server_environment[
+            "MAILPILOT_GMAIL_ACCESS_TOKEN"
+        ] = cleaned_access_token
+    else:
+        server_environment.pop(
+            "MAILPILOT_GMAIL_ACCESS_TOKEN",
+            None,
+        )
 
     server_parameters = StdioServerParameters(
         command=sys.executable,
         args=[str(SERVER_FILE)],
         cwd=str(PROJECT_DIR),
+        env=server_environment,
     )
 
     async with stdio_client(server_parameters) as (
@@ -103,6 +124,7 @@ async def list_mcp_tools() -> list[dict[str, Any]]:
 async def call_mcp_tool(
     tool_name: str,
     arguments: dict[str, Any],
+    access_token: str | None = None,
 ) -> Any:
     """Call a MailPilot MCP tool and return parsed Python data."""
 
@@ -122,4 +144,7 @@ async def call_mcp_tool(
 
         return parse_tool_result(result)
 
-    return await run_with_mcp_session(operation)
+    return await run_with_mcp_session(
+        operation,
+        access_token=access_token,
+    )

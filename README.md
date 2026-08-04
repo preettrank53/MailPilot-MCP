@@ -32,7 +32,8 @@ MailPilot-MCP/
     ├── test_gmail_agent.py     # Verifies the complete single-tool agent loop
     ├── test_iterative_agent.py # Verifies the multi-step reasoning agent loop
     ├── test_app_import.py      # Verifies Streamlit app imports
-    └── test_conversation_memory.py # Verifies conversation memory and follow-up contexts
+    ├── test_conversation_memory.py # Verifies conversation memory and follow-up contexts
+    └── test_web_access_token.py # Verifies web user access token integration
 ```
 
 ## Running Tests
@@ -75,6 +76,9 @@ All verification and protocol tests have been consolidated in the `tests/` direc
 
 # Test conversation memory and follow-up context resolution
 .venv\Scripts\python -m tests.test_conversation_memory
+
+# Verify Google Web OAuth access token signature compatibility
+.venv\Scripts\python -m tests.test_web_access_token
 ```
 
 ## Current status
@@ -98,3 +102,4 @@ All verification and protocol tests have been consolidated in the `tests/` direc
 - Connected the multi-step iterative Gmail agent to a Streamlit Chat interface, replacing the manual search panels with a conversational workspace, exposing tool traces, and preserving conversation logs across runs.
 - Implemented short-term conversational memory within the iterative Gmail agent, allowing the model to resolve contextual follow-ups (such as "it" or "the previous email") using a validated, token-optimized message window.
 - Configured a separate Google Web OAuth client for deployment compatibility, storing credentials in a Git-ignored `.streamlit/secrets.toml` file while maintaining local Desktop OAuth settings.
+- Refactored `gmail_service.py` to support per-request dependency injection of short-lived Web OAuth access tokens, allowing multitenant capability while keeping backward compatibility with the desktop credentials file.
