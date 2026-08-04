@@ -1,4 +1,5 @@
 import asyncio
+import os
 from typing import Any
 
 import streamlit as st
@@ -11,6 +12,24 @@ st.set_page_config(
     page_icon="📧",
     layout="centered",
 )
+
+
+def load_hosted_secrets() -> None:
+    """Expose hosted Streamlit secrets as process environment values."""
+
+    secret_names = (
+        "GROQ_API_KEY",
+        "GROQ_MODEL",
+    )
+
+    for secret_name in secret_names:
+        if secret_name in st.secrets:
+            os.environ[secret_name] = str(
+                st.secrets[secret_name]
+            )
+
+
+load_hosted_secrets()
 
 
 def require_gmail_connection() -> None:
@@ -95,51 +114,27 @@ st.caption(
     "AI-powered Gmail assistant using Groq and MCP"
 )
 
-with st.sidebar:
-    st.caption("Connected Gmail")
+# Minimal horizontal control bar instead of a sidebar
+col1, col2, col3 = st.columns([2, 1, 1])
+user_email = getattr(st.user, "email", "")
 
-    user_name = getattr(st.user, "name", "")
-    user_email = getattr(st.user, "email", "")
-
-    if user_name:
-        st.write(f"**{user_name}**")
-
+with col1:
     if user_email:
-        st.caption(user_email)
+        st.caption(f"Connected: **{user_email}**")
 
-    if st.button("Disconnect Gmail"):
+with col2:
+    if st.button("Clear chat", use_container_width=True):
+        st.session_state.messages = []
+        st.session_state.last_tool_history = []
+        st.rerun()
+
+with col3:
+    if st.button("Disconnect", use_container_width=True):
         st.session_state.messages = []
         st.session_state.last_tool_history = []
         st.logout()
 
-    st.divider()
-
-    st.subheader("Example prompts")
-
-    st.code(
-        "Show my five unread emails.",
-        language=None,
-    )
-
-    st.code(
-        "Summarize my newest unread email.",
-        language=None,
-    )
-
-    st.code(
-        "Find my latest email from Medium.",
-        language=None,
-    )
-
-    st.warning(
-        "Email data returned by Gmail tools is sent to the "
-        "configured AI provider for generating the answer."
-    )
-
-    if st.button("Clear conversation"):
-        st.session_state.messages = []
-        st.session_state.last_tool_history = []
-        st.rerun()
+st.divider()
 
 
 for message in st.session_state.messages:

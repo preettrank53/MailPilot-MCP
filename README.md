@@ -33,7 +33,8 @@ MailPilot-MCP/
     ├── test_iterative_agent.py # Verifies the multi-step reasoning agent loop
     ├── test_app_import.py      # Verifies Streamlit app imports
     ├── test_conversation_memory.py # Verifies conversation memory and follow-up contexts
-    └── test_web_access_token.py # Verifies web user access token integration
+    ├── test_web_access_token.py # Verifies web user access token integration
+    └── test_token_propagation.py # Verifies private token propagation to MCP subprocesses
 ```
 
 ## Running Tests
@@ -79,6 +80,9 @@ All verification and protocol tests have been consolidated in the `tests/` direc
 
 # Verify Google Web OAuth access token signature compatibility
 .venv\Scripts\python -m tests.test_web_access_token
+
+# Verify private token propagation to the MCP subprocess environment
+.venv\Scripts\python -m tests.test_token_propagation
 ```
 
 ## Current status
@@ -99,7 +103,9 @@ All verification and protocol tests have been consolidated in the `tests/` direc
 - Upgraded Groq model to `openai/gpt-oss-20b` and implemented dynamic model-side tool selection and routing without execution
 - Built the complete single-tool agent loop executing Groq-selected tools dynamically through the MCP client and generating grounded answers
 - Built a multi-step iterative AI agent Reasoning Loop (`run_iterative_gmail_agent`) allowing complex, sequential tool execution (e.g. `search_gmail` -> `get_gmail_email` -> grounded final answer) while enforcing a loop execution limit of 5 calls to prevent infinite loops.
-- Connected the multi-step iterative Gmail agent to a Streamlit Chat interface, replacing the manual search panels with a conversational workspace, exposing tool traces, and preserving conversation logs across runs.
+- Connected the multi-step iterative Gmail agent to a Streamlit Chat interface, replacing the manual sidebar with a minimal top-aligned horizontal control bar, exposing tool traces, and preserving conversation logs across runs.
 - Implemented short-term conversational memory within the iterative Gmail agent, allowing the model to resolve contextual follow-ups (such as "it" or "the previous email") using a validated, token-optimized message window.
 - Configured a separate Google Web OAuth client for deployment compatibility, storing credentials in a Git-ignored `.streamlit/secrets.toml` file while maintaining local Desktop OAuth settings.
 - Refactored `gmail_service.py` to support per-request dependency injection of short-lived Web OAuth access tokens, allowing multitenant capability while keeping backward compatibility with the desktop credentials file.
+- Propagated per-user OAuth tokens outside LLM-visible schema parameters, passing the temporary access token securely down to the MCP server subprocess via `os.environ` variables.
+- Added a `load_hosted_secrets()` hook to map production-hosted Streamlit app secrets into process environment variables, preparing the codebase for cloud deployment.
