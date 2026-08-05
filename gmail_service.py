@@ -261,3 +261,139 @@ def get_email(
         ) from error
 
 
+def build_thread_metadata(
+    thread_data: dict[str, Any],
+) -> dict[str, Any]:
+    """Build lightweight metadata for one Gmail thread."""
+
+    messages = thread_data.get("messages", [])
+
+    if not messages:
+        return {
+            "thread_id": thread_data.get("id", ""),
+            "subject": "(No subject)",
+            "participants": [],
+            "message_count": 0,
+            "latest_date": "",
+            "snippet": thread_data.get("snippet", ""),
+        }
+
+    participants: list[str] = []
+    subject = "(No subject)"
+    latest_date = ""
+
+    for message in messages:
+        headers = (
+            message.get("payload", {})
+            .get("headers", [])
+        )
+
+        sender = get_header(headers, "From")
+
+        if sender and sender not in participants:
+            participants.append(sender)
+
+        current_subject = get_header(
+            headers,
+            "Subject",
+        )
+
+        if (
+            subject == "(No subject)"
+            and current_subject
+        ):
+            subject = current_subject
+
+        current_date = get_header(
+            headers,
+            "Date",
+        )
+
+        if current_date:
+            latest_date = current_date
+
+    return {
+        "thread_id": thread_data.get("id", ""),
+        "subject": subject,
+        "participants": participants,
+        "message_count": len(messages),
+        "latest_date": latest_date,
+        "snippet": thread_data.get("snippet", ""),
+    }
+
+
+def search_threads(
+    query: str,
+    max_results: int = 5,
+    access_token: str | None = None,
+) -> list[dict[str, Any]]:
+    """Search Gmail threads and return lightweight metadata."""
+
+    cleaned_query = query.strip()
+
+    if not cleaned_query:
+        raise ValueError("query cannot be empty.")
+
+    if max_results < 1:
+        raise ValueError(
+            "max_results must be at least 1."
+        )
+
+    if max_results > 20:
+        raise ValueError(
+            "max_results cannot exceed 20."
+        )
+
+    service = build_gmail_service(
+        access_token=access_token
+    )
+
+    try:
+        response = (
+            service.users()
+            .threads()
+            .list(
+                userId="me",
+                q=cleaned_query,
+                maxResults=max_results,
+            )
+            .execute()
+        )
+
+        threads = response.get("threads", [])
+        results: list[dict[str, Any]] = []
+
+        for thread in threads:
+            thread_id = thread["id"]
+
+            thread_data = (
+                service.users()
+                .threads()
+                .get(
+                    userId="me",
+                    id=thread_id,
+                    format="metadata",
+                    metadataHeaders=[
+                        "From",
+                        "Subject",
+                        "Date",
+                    ],
+                )
+                .execute()
+            )
+
+            results.append(
+                build_thread_metadata(
+                    thread_data
+                )
+            )
+
+        return results
+
+    except HttpError as error:
+        raise RuntimeError(
+            f"Gmail thread search failed: {error}"
+        ) from error
+
+
+

@@ -3,7 +3,7 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from gmail_service import get_email, search_emails
+from gmail_service import get_email, search_emails, search_threads
 
 
 mcp = FastMCP("MailPilot Gmail MCP")
@@ -69,6 +69,31 @@ def get_gmail_email(
 
     return get_email(
         message_id=message_id,
+        access_token=get_request_access_token(),
+    )
+
+
+@mcp.tool()
+def search_gmail_threads(
+    query: str,
+    max_results: int = 5,
+) -> list[dict[str, Any]]:
+    """
+    Search Gmail conversations using Gmail search syntax.
+
+    Args:
+        query: Gmail search query such as
+            from:example.com or newer_than:7d.
+        max_results: Maximum number of threads to return.
+
+    Returns:
+        Thread metadata including thread ID, subject,
+        participants, message count, latest date and snippet.
+    """
+
+    return search_threads(
+        query=query,
+        max_results=max_results,
         access_token=get_request_access_token(),
     )
 

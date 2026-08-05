@@ -4,14 +4,10 @@ import json
 from ai_service import select_gmail_tool
 
 
-async def run_test() -> None:
-    user_request = "Show my five unread emails."
+async def test_request(user_request: str) -> None:
+    decision = await select_gmail_tool(user_request)
 
-    decision = await select_gmail_tool(
-        user_request
-    )
-
-    print(f"User request: {user_request}")
+    print(f"\nUser request: {user_request}")
     print(f"Decision type: {decision['type']}")
 
     if decision["type"] == "tool_call":
@@ -25,6 +21,15 @@ async def run_test() -> None:
         )
     else:
         print(f"Model response: {decision['content']}")
+    print("-" * 50)
+
+
+async def run_test() -> None:
+    # Existing test case
+    await test_request("Show my five unread emails.")
+
+    # New thread search test case
+    await test_request("Find my latest conversation with Medium.")
 
 
 def main() -> None:
