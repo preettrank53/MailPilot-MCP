@@ -1,111 +1,192 @@
 # MailPilot MCP
 
-MailPilot MCP is an AI-powered Gmail assistant built using Python, Streamlit, Gmail API, OAuth 2.0, and Model Context Protocol.
+AI-Powered Gmail Assistant - Built with Model Context Protocol (MCP), Streamlit & Groq
+
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://mailpilot-mcp.streamlit.app)
+
+![Python](https://img.shields.io/badge/Python-3.11+-blue) ![Streamlit](https://img.shields.io/badge/Streamlit-1.60-red) ![MCP](https://img.shields.io/badge/MCP-Standard-orange) ![Deployed](https://img.shields.io/badge/Deployed-Live-brightgreen) ![License](https://img.shields.io/badge/License-MIT-yellow)
+
+## [Live Demo : mailpilot-mcp.streamlit.app](https://mailpilot-mcp.streamlit.app)
+
+MailPilot is an intelligent, multi-user AI-powered email assistant designed to streamline your Gmail inbox management. Leveraging advanced large language models via Groq and the Model Context Protocol (MCP), it automates search, conversation tracking, and email summarization using natural language. MailPilot features a secure, multitenant architecture that dynamically routes and isolates user credentials, ensuring absolute data privacy and zero API leakage during processing.
+
+## Key Features
+* **Natural Language Chat Interface**: Retrieve, filter, and summarize emails by chatting naturally (e.g. *"Summarize my newest unread email"*).
+* **Multi-Turn Conversational Memory**: Seamlessly understand follow-up contexts (e.g. *"Now read it and write a summary"*).
+* **Conversational Thread Search**: Group and search complete email threads (`search_gmail_threads`) to inspect participants, message count, and snippets without fetching heavy body contents prematurely.
+* **Lazy Email Payload Retrieval**: Search results return lightweight metadata; full email bodies (`get_gmail_email`) are fetched only when the reasoning agent explicitly decides to read them.
+* **Decoupled Token Security**: Propagates Google OAuth access tokens privately to the MCP subprocess environment (`MAILPILOT_GMAIL_ACCESS_TOKEN`), keeping credentials hidden from LLM schemas, prompt histories, and tool traces.
+* **Autonomous ReAct Reasoning Loop**: Coordinates successive tool planning and execution dynamically, capped at 5 tool calls to prevent infinite loops.
+* **Visual Tool Activity Traces**: Collapsible UI expanders show exact tool calls, arguments, and responses behind the LLM's answers.
+
+## Architecture
+
+MailPilot leverages a decoupled model-client-server architecture. The Streamlit front-end authenticates the user, obtains a short-lived access token, and launches a reasoning loop. When the LLM decides to call a tool, the MCP Client spawns the MCP Server as an isolated child process, passing the access token privately through the process environment variables to run queries directly against the Gmail API.
+
+```
+Connected Streamlit User (OAuth) → st.user.tokens
+                                        ↓
+                            ┌──────────────────────┐
+                            │    Agent ReAct Loop  │
+                            │                      │
+                            │  Groq (Llama 3.3)    │
+                            └──────────────────────┘
+                                        ↓
+                            ┌──────────────────────┐
+                            │    MCP Stdio Client  │ (Injects Token to Subprocess Env)
+                            └──────────────────────┘
+                                        ↓ (Subprocess stdio)
+                            ┌──────────────────────┐
+                            │    MCP Stdio Server  │ (Extracts Token from Env)
+                            └──────────────────────┘
+                                        ↓
+                            ┌──────────────────────┐
+                            │  Gmail Service Layer │ (Dynamic Credential Builder)
+                            └──────────────────────┘
+                                        ↓
+                                    Gmail API
+```
+
+## Tech Stack
+
+| Category | Technology | Version | Purpose |
+| :--- | :--- | :--- | :--- |
+| Agent Framework | Model Context Protocol (MCP) | 1.29.0 | Decoupled tool discovery and stdio-based execution |
+| LLM Provider | Groq SDK | 1.6.0 | Fast, high-quality reasoning using Llama 3.3-70b-versatile |
+| Web Interface | Streamlit | 1.60.0 | Chat dashboard interface and horizontal session control bar |
+| Authentication | Streamlit Auth (Authlib) | 1.7.2 | Dynamic OIDC Google Login and Gmail read-only token acquisition |
+| API Integration | Google API Python Client | 2.198.0 | Workspace Gmail REST API endpoints interaction |
+
+## Getting Started
+
+### Prerequisites
+* Python 3.11+
+* [Groq API Key](https://console.groq.com/keys)
+* [Google Cloud Console Project](https://console.cloud.google.com/) with Gmail API enabled and OAuth client IDs generated.
+
+### Local Installation
+1. Clone the repository
+2. Create and activate a virtual environment:
+   ```powershell
+   python -m venv .venv
+   .venv\Scripts\activate
+   ```
+3. Install dependencies:
+   ```powershell
+   pip install -r requirements.txt
+   ```
+4. Copy `.env.example` to `.env` and fill in:
+   ```env
+   GROQ_API_KEY=your-groq-key-here
+   GROQ_MODEL=llama-3.3-70b-versatile
+   ```
+5. To test locally with Desktop OAuth credentials, place your downloaded client secrets file in the project root as `credentials.json` and start Streamlit:
+   ```powershell
+   streamlit run app.py
+   ```
+
+### Environment Variables
+
+| Variable | Required | Source |
+| :--- | :--- | :--- |
+| `GROQ_API_KEY` | Yes | [Groq Console](https://console.groq.com/keys) |
+| `GROQ_MODEL` | Yes | `llama-3.3-70b-versatile` |
+
+---
+
+## How to Use MailPilot
+
+1. **Step 1 — Connect your Gmail Account**: Click **Connect Gmail** on the launch screen to authenticate and authorize read-only access.
+2. **Step 2 — Search and Query**: Type commands into the chat input, such as *"Show me my latest unread emails from GitHub"* or *"Summarize the conversation with Medium"*.
+3. **Step 3 — Inspect Tool Activity**: Expand the **Tool activity** block beneath the assistant's answer to view the sequence of tool calls executed by the agent.
+4. **Step 4 — Disconnect**: Cleanly terminate your session and revoke active browser tokens by clicking **Disconnect** in the top control bar.
+
+---
 
 ## Project Structure
 
-```text
+```
 MailPilot-MCP/
 ├── .streamlit/
-│   └── secrets.toml        # Streamlit web credentials configuration (ignored)
-├── ai_service.py           # Groq API LLM assistant integration
-├── app.py                  # Streamlit interface
-├── auth.py                 # Gmail OAuth 2.0 flow helper
-├── gmail_service.py        # Gmail API service and search layer
-├── mcp_client.py           # Reusable Model Context Protocol (MCP) client module
-├── mcp_server.py           # Model Context Protocol (MCP) server
-├── requirements.txt        # Pinned dependencies
+│   └── secrets.toml        # Streamlit Web OAuth credentials configuration (ignored)
+├── ai_service.py           # Groq API LLM orchestrator and ReAct loop logic
+├── app.py                  # Streamlit frontend, control headers, and authentication gates
+├── auth.py                 # Gmail Desktop OAuth 2.0 flow helper
+├── gmail_service.py        # Gmail API wrappers, thread parsing, and payload decoder
+├── mcp_client.py           # Reusable Stdio-based MCP Client and subprocess launcher
+├── mcp_server.py           # FastMCP Server exposing Gmail search, retrieval, and threads tools
+├── requirements.txt        # Production Python dependencies
 ├── README.md               # Project documentation
 ├── .gitignore              # Files/folders ignored by Git
-├── credentials.json        # Google OAuth credentials (ignored)
-├── token.json              # Cached OAuth tokens (ignored)
-└── tests/                  # Verification and test suite
+├── credentials.json        # Google Desktop OAuth client secret file (ignored)
+├── token.json              # Cached Desktop OAuth access/refresh token (ignored)
+└── tests/                  # Automated verification and protocol test suite
     ├── __init__.py
-    ├── test_ai_service.py
-    ├── test_auth.py
-    ├── test_gmail_service.py
-    ├── test_search_emails.py
-    ├── test_get_email.py
-    ├── test_mcp_tool.py
-    ├── test_mcp_client.py
+    ├── test_search_threads.py   # Test suite for thread searching and parameter validations
     ├── test_tool_selection.py  # Verifies model tool selection and routing decisions
     ├── test_gmail_agent.py     # Verifies the complete single-tool agent loop
     ├── test_iterative_agent.py # Verifies the multi-step reasoning agent loop
-    ├── test_app_import.py      # Verifies Streamlit app imports
     ├── test_conversation_memory.py # Verifies conversation memory and follow-up contexts
     ├── test_web_access_token.py # Verifies web user access token integration
     └── test_token_propagation.py # Verifies private token propagation to MCP subprocesses
 ```
 
-## Running Tests
+---
 
-All verification and protocol tests have been consolidated in the `tests/` directory. You can run them as modules from the project root:
+## Deployment
+
+### Streamlit Community Cloud
+1. Push your repository to GitHub.
+2. Log in to [Streamlit Share](https://share.streamlit.io/) and deploy your repository from the `main` branch.
+3. Configure the following variables under **App settings > Secrets**:
+
+```toml
+GROQ_API_KEY = "your-groq-api-key"
+GROQ_MODEL = "llama-3.3-70b-versatile"
+
+[auth]
+redirect_uri = "https://mailpilot-mcp.streamlit.app/oauth2callback"
+cookie_secret = "your-cookie-secret-urlsafe-token"
+client_id = "your-google-web-client-id"
+client_secret = "your-google-web-client-secret"
+server_metadata_url = "https://accounts.google.com/.well-known/openid-configuration"
+expose_tokens = ["access"]
+
+[auth.client_kwargs]
+scope = "openid profile email https://www.googleapis.com/auth/gmail.readonly"
+prompt = "select_account consent"
+```
+
+*Ensure that `https://mailpilot-mcp.streamlit.app/oauth2callback` is added to your **Authorized redirect URIs** under your OAuth client ID credentials in the Google Cloud Console.*
+
+---
+
+## Testing
+
+All tests are designed to execute independently using module imports. Run the test suite using:
 
 ```powershell
-# Test authentication flow
-.venv\Scripts\python -m tests.test_auth
+# Test thread searching and metadata parsing
+.venv\Scripts\python -m tests.test_search_threads
 
-# Test basic Gmail service and email listing
-.venv\Scripts\python -m tests.test_gmail_service
-
-# Test search query functionality
-.venv\Scripts\python -m tests.test_search_emails
-
-# Test email body fetching and parsing
-.venv\Scripts\python -m tests.test_get_email
-
-# Test the MCP tool directly in Python
-.venv\Scripts\python -m tests.test_mcp_tool
-
-# Test the MCP server and tool over stdio transport using the MCP client
-.venv\Scripts\python -m tests.test_mcp_client
-
-# Test the Groq text generation AI service
-.venv\Scripts\python -m tests.test_ai_service
-
-# Test the model's tool selection and arguments generation
+# Test AI tool-routing and selection
 .venv\Scripts\python -m tests.test_tool_selection
 
-# Test the complete single-tool Gmail agent workflow
-.venv\Scripts\python -m tests.test_gmail_agent
-
-# Test the multi-step iterative AI agent reasoning loop
+# Test ReAct iterative reasoning loop
 .venv\Scripts\python -m tests.test_iterative_agent
 
-# Run syntax/import test on the Streamlit app
-.venv\Scripts\python -m tests.test_app_import
-
-# Test conversation memory and follow-up context resolution
-.venv\Scripts\python -m tests.test_conversation_memory
-
-# Verify Google Web OAuth access token signature compatibility
-.venv\Scripts\python -m tests.test_web_access_token
-
-# Verify private token propagation to the MCP subprocess environment
+# Test token propagation to MCP subprocess
 .venv\Scripts\python -m tests.test_token_propagation
 ```
 
-## Current status
+---
 
-- Project structure created and organized cleanly
-- Streamlit interface running
-- Gmail OAuth 2.0 authentication flow completed
-- Connected to Gmail API and successfully listing recent email subjects
-- Gmail search functionality added supporting advanced query syntax (e.g. `is:unread`, `from:sender`, `newer_than:7d`)
-- Email body extraction functionality implemented with recursive MIME traversal and Base64URL decoding
-- Integrated Gmail search with Streamlit frontend displaying structured results with collapsible detail expanders
-- Added detailed email viewing within the Streamlit UI, persisting state using Streamlit Session State across script reruns
-- Created a basic Model Context Protocol (MCP) server exposing the Gmail search functionality as an MCP tool
-- Implemented an MCP client that starts the server as a subprocess and tests tool discovery and execution over the stdio transport
-- Added the `get_gmail_email` tool to retrieve full email body details by message ID, establishing a clean separation between search and retrieval (lazy loading)
-- Extracted and encapsulated the low-level MCP transport and connection details into a reusable `mcp_client.py` module
-- Integrated Groq API for text generation using the official SDK, loading credentials and model config from `.env` (fully git-ignored)
-- Upgraded Groq model to `openai/gpt-oss-20b` and implemented dynamic model-side tool selection and routing without execution
-- Built the complete single-tool agent loop executing Groq-selected tools dynamically through the MCP client and generating grounded answers
-- Built a multi-step iterative AI agent Reasoning Loop (`run_iterative_gmail_agent`) allowing complex, sequential tool execution (e.g. `search_gmail` -> `get_gmail_email` -> grounded final answer) while enforcing a loop execution limit of 5 calls to prevent infinite loops.
-- Connected the multi-step iterative Gmail agent to a Streamlit Chat interface, replacing the manual sidebar with a minimal top-aligned horizontal control bar, exposing tool traces, and preserving conversation logs across runs.
-- Implemented short-term conversational memory within the iterative Gmail agent, allowing the model to resolve contextual follow-ups (such as "it" or "the previous email") using a validated, token-optimized message window.
-- Configured a separate Google Web OAuth client for deployment compatibility, storing credentials in a Git-ignored `.streamlit/secrets.toml` file while maintaining local Desktop OAuth settings.
-- Refactored `gmail_service.py` to support per-request dependency injection of short-lived Web OAuth access tokens, allowing multitenant capability while keeping backward compatibility with the desktop credentials file.
-- Propagated per-user OAuth tokens outside LLM-visible schema parameters, passing the temporary access token securely down to the MCP server subprocess via `os.environ` variables.
-- Added a `load_hosted_secrets()` hook to map production-hosted Streamlit app secrets into process environment variables, preparing the codebase for cloud deployment.
+## Known Limitations
+* Free-tier Groq API keys might experience brief rate limiting when performing rapid multi-step reasoning cycles (resolved by utilizing higher-tiered models like Llama 3.3).
+* Streamlit Community Cloud filesystem is ephemeral; local desktop cached files (if any) are not preserved across app restarts.
+* The Gmail API scope is configured for read-only access. Email editing, drafting, or sending are not supported out of the box.
+
+## License
+MIT License - feel free to use this project as a reference or starting point
+
+⭐ If you found this project useful, please consider starring the repository
