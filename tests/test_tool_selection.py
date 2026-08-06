@@ -31,6 +31,9 @@ async def run_test() -> None:
     # New thread search test case
     await test_request("Summarize my conversation with Medium.")
 
+    # New inbox summary test case
+    await test_request("Give me my morning inbox briefing.")
+
 
 def main() -> None:
     import sys

@@ -476,5 +476,93 @@ def build_thread(
     }
 
 
+def extract_sender_name(sender_raw: str) -> str:
+    """Extract a clean sender display name from raw From header value."""
+
+    if not sender_raw:
+        return "Unknown"
+
+    if "<" in sender_raw:
+        name_part = sender_raw.split("<")[0].strip()
+        if name_part.startswith('"') and name_part.endswith('"'):
+            name_part = name_part[1:-1].strip()
+        if name_part:
+            return name_part
+
+    return sender_raw.strip()
+
+
+def get_inbox_summary(
+    query: str = "newer_than:1d",
+    max_results: int = 20,
+    access_token: str | None = None,
+) -> dict[str, Any]:
+    """Retrieve a structured summary of recent inbox activity."""
+
+    cleaned_query = query.strip()
+
+    if not cleaned_query:
+        raise ValueError("query cannot be empty.")
+
+    if max_results < 1:
+        raise ValueError("max_results must be at least 1.")
+
+    if max_results > 50:
+        raise ValueError("max_results cannot exceed 50.")
+
+    # Fetch total matching emails
+    total_list = search_emails(
+        query=cleaned_query,
+        max_results=max_results,
+        access_token=access_token,
+    )
+
+    # Fetch unread matching emails
+    unread_query = f"{cleaned_query} is:unread"
+    unread_list = search_emails(
+        query=unread_query,
+        max_results=max_results,
+        access_token=access_token,
+    )
+
+    # Build sender frequency
+    sender_counts: dict[str, int] = {}
+    for email in total_list:
+        raw_sender = email.get("sender", "")
+        sender_name = extract_sender_name(raw_sender)
+        sender_counts[sender_name] = (
+            sender_counts.get(sender_name, 0) + 1
+        )
+
+    # Sort descending by count, then alphabetically
+    sorted_senders = sorted(
+        sender_counts.items(),
+        key=lambda item: (-item[1], item[0]),
+    )
+
+    senders_ranking = [
+        {"sender": k, "count": v}
+        for k, v in sorted_senders[:5]
+    ]
+
+    # Map to lightweight metadata
+    lightweight_emails = [
+        {
+            "subject": e.get("subject", ""),
+            "sender": e.get("sender", ""),
+            "date": e.get("date", ""),
+        }
+        for e in total_list
+    ]
+
+    return {
+        "total_emails": len(total_list),
+        "unread": len(unread_list),
+        "senders": senders_ranking,
+        "emails": lightweight_emails,
+    }
+
+
+
 
 

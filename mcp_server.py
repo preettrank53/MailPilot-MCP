@@ -6,6 +6,7 @@ from mcp.server.fastmcp import FastMCP
 from gmail_service import (
     build_thread,
     get_email,
+    get_inbox_summary as get_inbox_summary_impl,
     get_thread,
     search_emails,
     search_threads,
@@ -127,6 +128,33 @@ def get_gmail_thread(
         access_token=get_request_access_token(),
     )
     return build_thread(raw_thread)
+
+
+@mcp.tool()
+def get_inbox_summary(
+    query: str = "newer_than:1d",
+    max_results: int = 20,
+) -> dict[str, Any]:
+    """
+    Retrieve a structured, aggregated summary of recent Gmail inbox activity.
+
+    Do not use this to read specific email contents. Use it to understand
+    overall statistics, active senders, and recent email metadata.
+
+    Args:
+        query: Gmail search query such as newer_than:1d.
+        max_results: Maximum number of recent emails to aggregate.
+
+    Returns:
+        Structured inbox data with total_emails, unread count,
+        top senders, and a list of lightweight email metadata.
+    """
+
+    return get_inbox_summary_impl(
+        query=query,
+        max_results=max_results,
+        access_token=get_request_access_token(),
+    )
 
 
 if __name__ == "__main__":
