@@ -5,7 +5,7 @@ from ai_service import run_iterative_gmail_agent
 
 
 async def run_test() -> None:
-    user_request = "Summarize my newest unread email."
+    user_request = "Summarize my conversation with Medium."
 
     result = await run_iterative_gmail_agent(
         user_request

@@ -3,7 +3,13 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from gmail_service import get_email, search_emails, search_threads
+from gmail_service import (
+    build_thread,
+    get_email,
+    get_thread,
+    search_emails,
+    search_threads,
+)
 
 
 mcp = FastMCP("MailPilot Gmail MCP")
@@ -96,6 +102,31 @@ def search_gmail_threads(
         max_results=max_results,
         access_token=get_request_access_token(),
     )
+
+
+@mcp.tool()
+def get_gmail_thread(
+    thread_id: str,
+) -> dict[str, Any]:
+    """
+    Retrieve a complete Gmail thread (conversation) in chronological order.
+
+    Use this tool after search_gmail_threads returns a thread ID.
+
+    Args:
+        thread_id: Gmail thread ID.
+
+    Returns:
+        Thread details containing thread ID, subject, message count,
+        and chronological list of messages with message ID, sender,
+        recipient, date and plain-text body.
+    """
+
+    raw_thread = get_thread(
+        thread_id=thread_id,
+        access_token=get_request_access_token(),
+    )
+    return build_thread(raw_thread)
 
 
 if __name__ == "__main__":

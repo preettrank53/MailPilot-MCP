@@ -396,4 +396,85 @@ def search_threads(
         ) from error
 
 
+def get_thread(
+    thread_id: str,
+    access_token: str | None = None,
+) -> dict[str, Any]:
+    """Retrieve raw Gmail thread response by ID."""
+
+    cleaned_thread_id = thread_id.strip()
+
+    if not cleaned_thread_id:
+        raise ValueError("thread_id cannot be empty.")
+
+    service = build_gmail_service(access_token=access_token)
+
+    try:
+        response = (
+            service.users()
+            .threads()
+            .get(
+                userId="me",
+                id=cleaned_thread_id,
+                format="full",
+            )
+            .execute()
+        )
+        return response
+
+    except HttpError as error:
+        raise RuntimeError(
+            f"Gmail thread retrieval failed: {error}"
+        ) from error
+
+
+def build_thread(
+    thread_data: dict[str, Any],
+) -> dict[str, Any]:
+    """Build structured, chronological thread metadata from raw Gmail response."""
+
+    messages = thread_data.get("messages", [])
+    thread_id = thread_data.get("id", "")
+
+    # Sort messages chronologically by internalDate (Gmail internal timestamp)
+    try:
+        sorted_messages = sorted(
+            messages,
+            key=lambda m: int(m.get("internalDate", "0")),
+        )
+    except (ValueError, TypeError):
+        sorted_messages = messages
+
+    built_messages: list[dict[str, Any]] = []
+    subject = "(No subject)"
+
+    for message in sorted_messages:
+        payload = message.get("payload", {})
+        headers = payload.get("headers", [])
+
+        current_subject = get_header(headers, "Subject")
+        if subject == "(No subject)" and current_subject:
+            subject = current_subject
+
+        body = extract_plain_text(payload)
+
+        built_messages.append(
+            {
+                "message_id": message.get("id", ""),
+                "sender": get_header(headers, "From"),
+                "recipient": get_header(headers, "To"),
+                "date": get_header(headers, "Date"),
+                "body": body or "(No plain-text body found)",
+            }
+        )
+
+    return {
+        "thread_id": thread_id,
+        "subject": subject,
+        "message_count": len(built_messages),
+        "messages": built_messages,
+    }
+
+
+
 

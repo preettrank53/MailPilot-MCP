@@ -29,7 +29,7 @@ async def run_test() -> None:
     await test_request("Show my five unread emails.")
 
     # New thread search test case
-    await test_request("Find my latest conversation with Medium.")
+    await test_request("Summarize my conversation with Medium.")
 
 
 def main() -> None:
