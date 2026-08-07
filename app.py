@@ -5,6 +5,7 @@ from typing import Any
 import streamlit as st
 
 from ai_service import run_iterative_gmail_agent
+from mcp_client import call_mcp_tool
 
 
 st.set_page_config(
@@ -71,6 +72,9 @@ def initialize_session_state() -> None:
     if "last_tool_history" not in st.session_state:
         st.session_state.last_tool_history = []
 
+    if "pending_action" not in st.session_state:
+        st.session_state.pending_action = None
+
 
 def display_tool_history(
     tool_history: list[dict[str, Any]],
@@ -94,6 +98,127 @@ def display_tool_history(
             st.json(
                 tool_call["arguments"]
             )
+
+
+def display_pending_draft(
+    pending_action: dict[str, Any],
+) -> None:
+    """Display a pending Gmail draft for user approval."""
+
+    if (
+        not pending_action
+        or pending_action.get("tool_name")
+        != "create_gmail_draft"
+    ):
+        return
+
+    arguments = pending_action.get(
+        "arguments",
+        {},
+    )
+
+    to = arguments.get("to", "")
+    subject = arguments.get("subject", "")
+    body = arguments.get("body", "")
+
+    st.divider()
+    st.subheader("Draft preview")
+
+    st.write(f"**To:** {to}")
+    st.write(f"**Subject:** {subject}")
+
+    st.text_area(
+        "Body",
+        value=body,
+        height=220,
+        disabled=True,
+        key="pending_draft_body_preview",
+    )
+
+    confirm_column, cancel_column = st.columns(2)
+
+    with confirm_column:
+        create_clicked = st.button(
+            "Create Draft",
+            type="primary",
+            use_container_width=True,
+        )
+
+    with cancel_column:
+        cancel_clicked = st.button(
+            "Cancel",
+            use_container_width=True,
+        )
+
+    if create_clicked:
+        try:
+            access_token = st.user.tokens.get(
+                "access"
+            )
+
+            if not access_token:
+                st.error(
+                    "Your Gmail session has expired. "
+                    "Reconnect Gmail and try again."
+                )
+                return
+
+            with st.spinner(
+                "Creating Gmail draft..."
+            ):
+                result = asyncio.run(
+                    call_mcp_tool(
+                        tool_name="create_gmail_draft",
+                        arguments={
+                            "to": to,
+                            "subject": subject,
+                            "body": body,
+                        },
+                        access_token=access_token,
+                    )
+                )
+
+            st.session_state.pending_action = None
+
+            st.success(
+                "Draft created successfully in Gmail."
+            )
+
+            st.session_state.messages.append(
+                {
+                    "role": "assistant",
+                    "content": (
+                        "Draft created successfully in Gmail. "
+                        "It has not been sent."
+                    ),
+                }
+            )
+
+            st.rerun()
+
+        except RuntimeError as error:
+            st.error(str(error))
+
+        except Exception:
+            st.error(
+                "An unexpected error occurred while "
+                "creating the Gmail draft."
+            )
+
+    if cancel_clicked:
+        st.session_state.pending_action = None
+
+        st.session_state.messages.append(
+            {
+                "role": "assistant",
+                "content": (
+                    "Draft creation cancelled. "
+                    "No Gmail draft was created."
+                ),
+            }
+        )
+
+        st.rerun()
 
 
 require_gmail_connection()
@@ -126,12 +251,14 @@ with col2:
     if st.button("Clear chat", use_container_width=True):
         st.session_state.messages = []
         st.session_state.last_tool_history = []
+        st.session_state.pending_action = None
         st.rerun()
 
 with col3:
     if st.button("Disconnect", use_container_width=True):
         st.session_state.messages = []
         st.session_state.last_tool_history = []
+        st.session_state.pending_action = None
         st.logout()
 
 st.divider()
@@ -187,14 +314,27 @@ if prompt:
 
             answer = result["answer"]
             tool_history = result["tool_history"]
+            pending_action = result.get("pending_action")
 
-            st.markdown(answer)
+            st.session_state.pending_action = pending_action
+
+            if pending_action:
+                st.info(
+                    "I prepared a Gmail draft. Review it below before creating it."
+                )
+            elif answer:
+                st.markdown(answer)
+
             display_tool_history(tool_history)
 
         st.session_state.messages.append(
             {
                 "role": "assistant",
-                "content": answer,
+                "content": (
+                    "I prepared a Gmail draft. Review it below before creating it."
+                    if pending_action
+                    else answer
+                ),
                 "tool_history": tool_history,
             }
         )
@@ -202,6 +342,7 @@ if prompt:
         st.session_state.last_tool_history = (
             tool_history
         )
+        st.rerun()
 
     except ValueError as error:
         with st.chat_message("assistant"):
@@ -217,3 +358,9 @@ if prompt:
                 "An unexpected error occurred while processing "
                 "your request."
             )
+
+
+if st.session_state.pending_action:
+    display_pending_draft(
+        st.session_state.pending_action
+    )

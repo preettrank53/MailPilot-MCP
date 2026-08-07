@@ -1,5 +1,6 @@
 import json
 import os
+import time
 from typing import Any
 
 from dotenv import load_dotenv
@@ -37,6 +38,33 @@ def get_model_name() -> str:
     return model_name
 
 
+def chat_completion_with_retry(client: Groq, **kwargs: Any) -> Any:
+    """Execute Groq chat completion with exponential backoff on rate limits."""
+
+    max_retries = 5
+    base_delay = 2.0
+
+    for attempt in range(max_retries):
+        try:
+            return client.chat.completions.create(**kwargs)
+        except Exception as error:
+            err_msg = str(error).lower()
+            # Catch RateLimitError explicitly or any exception that contains 429 / rate limit
+            is_rate_limit = (
+                "429" in err_msg
+                or "rate limit" in err_msg
+                or "too many requests" in err_msg
+                or "rate_limit" in type(error).__name__.lower()
+            )
+            if is_rate_limit:
+                if attempt == max_retries - 1:
+                    raise error
+                delay = base_delay * (2**attempt)
+                time.sleep(delay)
+            else:
+                raise error
+
+
 def generate_text(prompt: str) -> str:
     """Generate a text response using Groq."""
 
@@ -48,7 +76,8 @@ def generate_text(prompt: str) -> str:
     client = get_groq_client()
     model_name = get_model_name()
 
-    chat_completion = client.chat.completions.create(
+    chat_completion = chat_completion_with_retry(
+        client,
         messages=[
             {
                 "role": "user",
@@ -222,7 +251,8 @@ async def run_gmail_agent(
         },
     ]
 
-    first_response = client.chat.completions.create(
+    first_response = chat_completion_with_retry(
+        client,
         model=model_name,
         messages=messages,
         tools=groq_tools,
@@ -414,7 +444,8 @@ async def run_iterative_gmail_agent(
     MAX_TOOL_CALLS = 5
 
     while True:
-        response = client.chat.completions.create(
+        response = chat_completion_with_retry(
+            client,
             model=model_name,
             messages=messages,
             tools=groq_tools,
