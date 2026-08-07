@@ -5,6 +5,7 @@ from mcp.server.fastmcp import FastMCP
 
 from gmail_service import (
     build_thread,
+    create_draft,
     get_email,
     get_inbox_summary as get_inbox_summary_impl,
     get_thread,
@@ -153,6 +154,34 @@ def get_inbox_summary(
     return get_inbox_summary_impl(
         query=query,
         max_results=max_results,
+        access_token=get_request_access_token(),
+    )
+
+
+@mcp.tool()
+def create_gmail_draft(
+    to: str,
+    subject: str,
+    body: str,
+) -> dict[str, str]:
+    """
+    Create a Gmail draft without sending it.
+
+    This tool should only be executed after explicit user confirmation.
+
+    Args:
+        to: Recipient email address.
+        subject: Draft email subject.
+        body: Plain-text email body.
+
+    Returns:
+        Draft ID, message ID, thread ID and creation status.
+    """
+
+    return create_draft(
+        to=to,
+        subject=subject,
+        body=body,
         access_token=get_request_access_token(),
     )
 

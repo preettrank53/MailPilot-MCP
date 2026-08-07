@@ -5,7 +5,7 @@ from ai_service import run_iterative_gmail_agent
 
 
 async def run_test() -> None:
-    user_request = "What's important in today's inbox?"
+    user_request = "Reply to Jia from Unstop and confirm I am interested."
 
     result = await run_iterative_gmail_agent(
         user_request
@@ -19,9 +19,14 @@ async def run_test() -> None:
             f"  Step {i}: {step['tool_name']} with arguments: {step['arguments']}"
         )
 
+    print("\nPending Action:")
+    print("-" * 50)
+    print(json.dumps(result.get("pending_action"), indent=2))
+    print("-" * 50)
+
     print("\nFinal answer:")
     print("-" * 50)
-    print(result["answer"])
+    print(result.get("answer"))
     print("-" * 50)
 
 

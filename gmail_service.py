@@ -1,4 +1,5 @@
 import base64
+from email.message import EmailMessage
 from typing import Any
 
 
@@ -24,7 +25,8 @@ def build_gmail_service(
         credentials = Credentials(
             token=cleaned_access_token,
             scopes=[
-                "https://www.googleapis.com/auth/gmail.readonly"
+                "https://www.googleapis.com/auth/gmail.readonly",
+                "https://www.googleapis.com/auth/gmail.compose",
             ],
         )
     else:
@@ -561,6 +563,92 @@ def get_inbox_summary(
         "senders": senders_ranking,
         "emails": lightweight_emails,
     }
+
+
+def build_email_message(
+    to: str,
+    subject: str,
+    body: str,
+) -> str:
+    """Build a Gmail API-compatible encoded email message."""
+
+    cleaned_to = to.strip()
+    cleaned_subject = subject.strip()
+    cleaned_body = body.strip()
+
+    if not cleaned_to:
+        raise ValueError("to cannot be empty.")
+
+    if not cleaned_subject:
+        raise ValueError("subject cannot be empty.")
+
+    if not cleaned_body:
+        raise ValueError("body cannot be empty.")
+
+    message = EmailMessage()
+
+    message["To"] = cleaned_to
+    message["Subject"] = cleaned_subject
+
+    message.set_content(cleaned_body)
+
+    encoded_message = base64.urlsafe_b64encode(
+        message.as_bytes()
+    ).decode("utf-8")
+
+    return encoded_message
+
+
+def create_draft(
+    to: str,
+    subject: str,
+    body: str,
+    access_token: str | None = None,
+) -> dict[str, str]:
+    """Create a Gmail draft without sending it."""
+
+    service = build_gmail_service(
+        access_token=access_token
+    )
+
+    raw_message = build_email_message(
+        to=to,
+        subject=subject,
+        body=body,
+    )
+
+    try:
+        response = (
+            service.users()
+            .drafts()
+            .create(
+                userId="me",
+                body={
+                    "message": {
+                        "raw": raw_message,
+                    }
+                },
+            )
+            .execute()
+        )
+
+        message = response.get("message", {})
+
+        return {
+            "draft_id": response.get("id", ""),
+            "message_id": message.get("id", ""),
+            "thread_id": message.get(
+                "threadId",
+                "",
+            ),
+            "status": "draft_created",
+        }
+
+    except HttpError as error:
+        raise RuntimeError(
+            f"Unable to create Gmail draft: {error}"
+        ) from error
+
 
 
 

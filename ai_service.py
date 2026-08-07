@@ -360,6 +360,11 @@ def prepare_conversation_history(
     return prepared_messages
 
 
+WRITE_TOOLS = {
+    "create_gmail_draft",
+}
+
+
 async def run_iterative_gmail_agent(
     user_request: str,
     conversation_history: list[dict[str, str]] | None = None,
@@ -393,7 +398,8 @@ async def run_iterative_gmail_agent(
                 "3. For requests about individual emails or messages, use the message tools: search_gmail and get_gmail_email.\n"
                 "4. Use the recent conversation history to understand references such as 'it', 'that email', 'the thread', or 'the previous one'. Use any message IDs or thread IDs present in the history directly instead of searching for them again.\n"
                 "5. Never invent email details or message IDs.\n"
-                "6. After receiving tool results, answer clearly and only using information supported by those results."
+                "6. After receiving tool results, answer clearly and only using information supported by those results.\n"
+                "7. When replying to an email, sender, or conversation, you MUST first search for the email or thread to find the correct recipient email address and subject. Never guess or invent recipient addresses or subjects."
             ),
         },
         *history,
@@ -443,6 +449,17 @@ async def run_iterative_gmail_agent(
             raise RuntimeError(
                 "Groq tool arguments must be a JSON object."
             )
+
+        if tool_name in WRITE_TOOLS:
+            return {
+                "answer": "",
+                "tool_history": tool_history,
+                "total_tool_calls": total_tool_calls,
+                "pending_action": {
+                    "tool_name": tool_name,
+                    "arguments": tool_arguments,
+                },
+            }
 
         if total_tool_calls >= MAX_TOOL_CALLS:
             raise RuntimeError("Maximum tool calls exceeded.")
@@ -498,5 +515,6 @@ async def run_iterative_gmail_agent(
         "answer": final_content.strip(),
         "tool_history": tool_history,
         "total_tool_calls": total_tool_calls,
+        "pending_action": None,
     }
 
