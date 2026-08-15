@@ -355,12 +355,13 @@ if prompt:
         with st.chat_message("assistant"):
             st.error(str(error))
 
-    except Exception:
+    except Exception as error:
         with st.chat_message("assistant"):
             st.error(
-                "An unexpected error occurred while processing "
-                "your request."
+                f"An unexpected error occurred while processing your request: {str(error)}"
             )
+            import traceback
+            st.code(traceback.format_exc(), language="python")
 
 
 if st.session_state.pending_action:

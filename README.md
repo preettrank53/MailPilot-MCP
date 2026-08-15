@@ -64,7 +64,7 @@ Connected Streamlit User (OAuth) → st.user.tokens
 | Category | Technology | Version | Purpose |
 | :--- | :--- | :--- | :--- |
 | Agent Framework | Model Context Protocol (MCP) | 1.29.0 | Decoupled tool discovery and stdio-based execution |
-| LLM Provider | Groq SDK | 1.6.0 | Fast, high-quality reasoning using Llama 3.3-70b-versatile |
+| LLM Provider | Groq SDK | 1.6.0 | Fast, high-quality reasoning using GPT OSS 120B |
 | Web Interface | Streamlit | 1.60.0 | Chat dashboard interface and horizontal session control bar |
 | Authentication | Streamlit Auth (Authlib) | 1.7.2 | Dynamic OIDC Google Login and Gmail access/refresh token acquisition |
 | API Integration | Google API Python Client | 2.198.0 | Workspace Gmail REST API endpoints interaction |
