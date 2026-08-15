@@ -550,6 +550,7 @@ def get_inbox_summary(
     # Map to lightweight metadata
     lightweight_emails = [
         {
+            "id": e.get("id", ""),
             "subject": e.get("subject", ""),
             "sender": e.get("sender", ""),
             "date": e.get("date", ""),
