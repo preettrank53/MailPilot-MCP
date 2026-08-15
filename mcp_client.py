@@ -34,7 +34,7 @@ def parse_tool_result(result: Any) -> Any:
 
     if not text_blocks:
         raise RuntimeError(
-            "The MCP tool returned no text content."
+            f"The MCP tool returned no text content. Result details: isError={getattr(result, 'isError', None)}, content={getattr(result, 'content', None)}"
         )
 
     if result.isError:
