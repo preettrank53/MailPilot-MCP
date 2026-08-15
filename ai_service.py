@@ -1,7 +1,7 @@
 import json
 import os
 import time
-from typing import Any
+from typing import Any, Callable
 
 from dotenv import load_dotenv
 from groq import Groq
@@ -399,6 +399,7 @@ async def run_iterative_gmail_agent(
     user_request: str,
     conversation_history: list[dict[str, str]] | None = None,
     access_token: str | None = None,
+    on_step_callback: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     """Autonomous iterative Gmail agent that loops reasoning and tool calls with context."""
 
@@ -406,6 +407,9 @@ async def run_iterative_gmail_agent(
 
     if not cleaned_request:
         raise ValueError("user_request cannot be empty.")
+
+    if on_step_callback:
+        on_step_callback("Analyzing request and planning steps...")
 
     mcp_tools = await list_mcp_tools()
     groq_tools = convert_mcp_tools_to_groq(mcp_tools)
@@ -456,6 +460,8 @@ async def run_iterative_gmail_agent(
         message = response.choices[0].message
 
         if not message.tool_calls:
+            if on_step_callback:
+                on_step_callback("Preparing final response...")
             final_content = message.content or ""
             break
 
@@ -482,6 +488,8 @@ async def run_iterative_gmail_agent(
             )
 
         if tool_name in WRITE_TOOLS:
+            if on_step_callback:
+                on_step_callback("Proposed write action. Pausing for human approval.")
             return {
                 "answer": "",
                 "tool_history": tool_history,
@@ -494,6 +502,9 @@ async def run_iterative_gmail_agent(
 
         if total_tool_calls >= MAX_TOOL_CALLS:
             raise RuntimeError("Maximum tool calls exceeded.")
+
+        if on_step_callback:
+            on_step_callback(f"Executing tool: `{tool_name}`...")
 
         tool_result = await call_mcp_tool(
             tool_name=tool_name,

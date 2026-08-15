@@ -301,16 +301,19 @@ if prompt:
 
     try:
         with st.chat_message("assistant"):
-            with st.spinner(
-                "MailPilot is checking your Gmail..."
-            ):
+            with st.status("MailPilot is checking your Gmail...", expanded=True) as status:
+                def update_status(message: str) -> None:
+                    st.write(f"✓ {message}")
+
                 result = asyncio.run(
                     run_iterative_gmail_agent(
                         user_request=prompt,
                         conversation_history=conversation_history,
                         access_token=st.user.tokens.get("access"),
+                        on_step_callback=update_status,
                     )
                 )
+                status.update(label="MailPilot finished checking Gmail.", state="complete", expanded=False)
 
             answer = result["answer"]
             tool_history = result["tool_history"]
